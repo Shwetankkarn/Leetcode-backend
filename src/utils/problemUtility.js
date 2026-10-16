@@ -17,15 +17,62 @@ const getLanguageById = (lang) => {
   return languages[lang.trim().toLowerCase()] || null;
 };
 
-// Wrapper for the current Valid Parentheses problem.
-// JDoodle needs a Java main() method to execute the Solution class.
+// Build a Java main() wrapper for Two Sum and Valid Parentheses.
 const wrapJavaCode = (code, input) => {
-  // If the user submitted a complete Java program, use it as-is.
+  // Complete Java programs can execute directly.
   if (/public\s+static\s+void\s+main\s*\(/.test(code)) {
     return code;
   }
 
-  const escapedInput = JSON.stringify(input ?? "");
+  const escapedInput = JSON.stringify(String(input ?? ""));
+  let mainCode;
+
+  if (/\btwoSum\s*\(/.test(code)) {
+    mainCode = `
+        String rawInput = ${escapedInput};
+
+        java.util.regex.Matcher matcher =
+            java.util.regex.Pattern.compile("-?\\\\d+").matcher(rawInput);
+
+        java.util.List<Integer> values = new java.util.ArrayList<>();
+
+        while (matcher.find()) {
+            values.add(Integer.parseInt(matcher.group()));
+        }
+
+        if (values.size() < 3) {
+            throw new IllegalArgumentException(
+                "Two Sum input must contain array values and a target."
+            );
+        }
+
+        int target = values.get(values.size() - 1);
+        int[] nums = new int[values.size() - 1];
+
+        for (int i = 0; i < nums.length; i++) {
+            nums[i] = values.get(i);
+        }
+
+        Solution solution = new Solution();
+        int[] result = solution.twoSum(nums, target);
+
+        for (int i = 0; i < result.length; i++) {
+            if (i > 0) System.out.print(" ");
+            System.out.print(result[i]);
+        }
+    `;
+  } else if (/\bisValid\s*\(/.test(code)) {
+    mainCode = `
+        String s = ${escapedInput};
+
+        Solution solution = new Solution();
+        System.out.print(solution.isValid(s));
+    `;
+  } else {
+    throw new Error(
+      "Unsupported Java solution. Expected twoSum() or isValid()."
+    );
+  }
 
   return `
 import java.util.*;
@@ -34,9 +81,7 @@ ${code}
 
 public class Main {
     public static void main(String[] args) {
-        String s = ${escapedInput};
-        Solution solution = new Solution();
-        System.out.print(solution.isValid(s));
+        ${mainCode}
     }
 }
 `;
@@ -46,14 +91,14 @@ const executeCode = async (code, language, input) => {
   const languageConfig = getLanguageById(language);
 
   if (!languageConfig) {
-    throw new Error(`Unsupported language: ${language}`);
+    throw new Error("Unsupported language: " + language);
   }
 
   if (
     !process.env.JDOODLE_CLIENT_ID ||
     !process.env.JDOODLE_CLIENT_SECRET
   ) {
-    throw new Error("JDoodle credentials are missing from .env");
+    throw new Error("JDoodle credentials are missing.");
   }
 
   const script =
@@ -79,8 +124,6 @@ const executeCode = async (code, language, input) => {
       { timeout: 15000 }
     );
 
-    console.log("JDoodle: response received");
-    console.log("JDoodle status:", response.status);
     console.log("JDoodle output:", response.data.output);
     console.log("JDoodle error:", response.data.error);
 
@@ -96,6 +139,11 @@ const executeCode = async (code, language, input) => {
   }
 };
 
+const normalizeOutput = (value) =>
+  String(value ?? "")
+    .trim()
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+/g, " ");
 
 const submitBatch = async (submissions) => {
   if (!Array.isArray(submissions) || submissions.length === 0) {
@@ -104,9 +152,12 @@ const submitBatch = async (submissions) => {
 
   return Promise.all(
     submissions.map(async (submission, index) => {
-      console.log(`\n--- Test Case ${index + 1} ---`);
+      console.log(`--- Test Case ${index + 1} ---`);
       console.log("Input:", JSON.stringify(submission.stdin));
-      console.log("Expected:", JSON.stringify(submission.expected_output));
+      console.log(
+        "Expected:",
+        JSON.stringify(submission.expected_output)
+      );
 
       const result = await executeCode(
         submission.source_code,
@@ -114,15 +165,16 @@ const submitBatch = async (submissions) => {
         submission.stdin
       );
 
-      const output = String(result.output ?? "").trim();
-      const expected = String(submission.expected_output ?? "").trim();
+      const output = normalizeOutput(result.output);
+      const expected = normalizeOutput(submission.expected_output);
 
       console.log("Actual:", JSON.stringify(output));
       console.log("Match:", output === expected);
 
       let statusId = 3;
+      let errorMessage = result.error || null;
 
-      if (result.error || (result.statusCode && result.statusCode !== 200)) {
+      if (result.error) {
         statusId = 6;
       } else if (output !== expected) {
         statusId = 4;
@@ -130,19 +182,18 @@ const submitBatch = async (submissions) => {
 
       return {
         stdout: result.output ?? "",
-        stderr: result.error ?? null,
-        compile_output: result.error ?? null,
+        stderr: errorMessage,
+        compile_output: errorMessage,
         status_id: statusId,
         time: result.cpuTime ?? "0",
         memory: result.memory ?? 0,
-        message: result.error ?? null,
+        message: errorMessage,
       };
     })
   );
 };
 
-
-// JDoodle returns results directly; no Judge0 token polling is needed.
+// JDoodle returns execution results directly.
 const submitToken = async (results) => results;
 
 module.exports = {
