@@ -20,7 +20,7 @@ const register = async (req, res) => {
     //  JWT(json web Token)
     const token = jwt.sign(
       { _id: user._id, email: emailId, role: user.role },
-      process.env.JWT_KEY,
+      process.env.JWT_SECRET,
       { expiresIn: "1h" },
     );
     const result = {
@@ -61,7 +61,7 @@ const login = async (req, res) => {
     //  JWT(json web Token)
     const token = jwt.sign(
       { _id: user._id, email: emailId, role: user.role },
-      process.env.JWT_KEY,
+      process.env.JWT_SECRET,
       { expiresIn: "1h" },
     );
     const result = {
@@ -118,7 +118,7 @@ const adminRegister = async (req, res) => {
     //  JWT(json web Token)
     const token = jwt.sign(
       { _id: user._id, email: emailId },
-      process.env.JWT_KEY,
+     process.env.JWT_SECRET,
       { expiresIn: "1h" },
     );
     res.cookie("token", token, {
