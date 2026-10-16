@@ -13,13 +13,15 @@ const chatRouter = require("./Routes/chatRouter");
 const videoRouter = require("./Routes/videoRouter");
 const cors = require("cors");
 
+
 const corsOptions = {
   origin: [
-    "https://leetcode-frontend-sage.vercel.app",
+    "https://leetcode-clone-nu.vercel.app",
     "http://localhost:5173",
   ],
   credentials: true,
 };
+
 
 app.use(cors(corsOptions));
 app.use(express.json());
